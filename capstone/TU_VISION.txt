@@ -1,0 +1,149 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║                         TU VISIÓN DEL AGENTE                            ║
+║                     (Definido en la entrevista)                         ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+🎯 LA PROMESA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Dado una solicitud de DJ en chat interactivo, mi agente produce 1 JSON 
+con playlists validadas, y sé que funciona porque:
+  • Duración = exacta
+  • Tonalidades = concuerdan
+  • Artistas = sin repetir en su fase"
+
+🛑 LA LÍNEA ROJA (Decisiones que NO toma Claude)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. AMBIGÜEDAD EN TAREA
+   ├─ Ejemplo: DJ pide 90 min sin especificar 1 o 2 sets
+   ├─ Agente hace: DETIENE y pide confirmación
+   └─ DJ decide: "¿1 set de 90 min o 2 sets de 45+45?"
+
+2. CATÁLOGO INSUFICIENTE
+   ├─ Ejemplo: "90 min sin repetir artistas" pero hay pocos tracks
+   ├─ Agente hace: GENERA BEST-EFFORT
+   └─ Agente advierte: "⚠️ Tuve que repetir 2 artistas. ¿OK?"
+
+3. APROBACIÓN FINAL
+   ├─ Ejemplo: Agente genera playlist preview
+   ├─ Agente hace: ESPERA validación DJ
+   └─ DJ valida: Duración OK? Tonalidades OK? Artistas OK?
+      └─ Solo después de ✅ → se genera JSON final
+
+4. URGENCIA IMPOSIBLE
+   ├─ Ejemplo: "Necesito esto en 30 segundos"
+   ├─ Agente hace: ADVIERTE (mínimo viable = 2 min)
+   └─ Agente NO ejecuta bajo presión
+
+📊 TU GOLDEN SET (Caso Crítico)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+request_03_complex.txt (Alex, 90 min, 2 fases)
+
+FUNCIONA si:
+  ✅ FASE 1: exactamente 45±1 min, BPM 110-120, tonos MENORES
+  ✅ FASE 2: exactamente 45±1 min, BPM 120-130, tonos MAYORES
+  ✅ Sin artistas repetidos DENTRO de cada fase
+  ✅ JSON: { "phase_1": [...], "phase_2": [...] }
+  ✅ Explicación: por qué cada pista
+
+FRACASA si:
+  ❌ Duración fuera de rango (< 44 o > 46 min cualquier fase)
+  ❌ Track fase 1 con tonalidad mayor (debe ser menor)
+  ❌ Track fase 2 con tonalidad menor (debe ser mayor)
+  ❌ Artista repetido en la misma fase
+  ❌ JSON vacío o incompleto
+
+📥 ENTRADA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Quién: DJ en chat interactivo
+• Qué: Solicitud natural (puede ser vaga)
+• Ejemplo:
+  "Necesito 90 minutos
+   Fase 1: tonos menores, 110-120 BPM
+   Fase 2: tonos mayores, 120-130 BPM
+   Sin artistas repetidos"
+
+• NO: Pegar archivos
+• SÍ: Chat natural, DJ decide cuándo lanzar
+
+🔄 FLUJO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DJ en chat: "Necesito 90 min..."
+2. Agente parsea: "¿90 min = 1 set o 2 sets?" → DETIENE
+3. DJ responde: "2 sets de 45"
+4. Agente valida: BPM + tonalidades vs catálogo
+5. Agente si insuficiente: BEST-EFFORT + avisa
+6. Agente propone: Preview de playlist
+7. DJ VALIDA y APRUEBA ✅
+8. Agente genera: 1 JSON final (ambas fases)
+
+📤 SALIDA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1 JSON con:
+{
+  "phase_1": [
+    { "id": 1, "artist": "...", "bpm": 110, "tonality": "A_minor", ... },
+    ...
+  ],
+  "phase_2": [
+    { "id": 10, "artist": "...", "bpm": 120, "tonality": "C_major", ... },
+    ...
+  ]
+}
+
++ Explicación (por qué cada pista)
++ Estadísticas (duración total, BPM range, tonalidades)
+
+💾 DATOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Catálogo: Mock ~100 tracks (MVP)
+
+Campos IMPRESCINDIBLES:
+  • bpm (de ahí sale la duración total del set)
+  • tonality (mayor/menor para validar fases)
+
+Otros:
+  • artista
+  • duración (min)
+  • género
+  • mood
+  • id
+
+🌙 DÍA MALO (Cómo Reacciona)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PEOR: Urgencia imposible (< 2 minutos)
+  DJ: "Necesito esto en 30 segundos"
+  Agente: "❌ No tengo tiempo. Catálogo requiere 2 min mínimo. ¿Postergamos?"
+
+MALO: Catálogo insuficiente
+  DJ: "90 min sin repetir artistas"
+  Catálogo: Solo 50 tracks totales
+  Agente: "⚠️ Genero 65 min. Tuve que repetir 2 artistas. ¿OK?"
+  DJ: Acepta o cambia restricción
+
+✋ GUARDRAILS (Lo que el código NO permite)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ BPM fuera de rango catálogo
+❌ Tonalidades que no existen
+❌ Duración > duración máxima disponible
+❌ Artistas repetidos sin justificación
+❌ Timeout > 5 min (infinite loop)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📄 Lee CLAUDE.md para los detalles técnicos.
+📄 Lee ENTREVISTA_RESUMEN.md para respuestas completas.
+
+Fecha: 2026-11-11
+Entrevistador: Claude Code
+Estado: ✅ Visión definida, lista para implementar
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
